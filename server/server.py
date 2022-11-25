@@ -14,8 +14,7 @@
 
 import socket 
 import sys
-import os
-import random
+import os, glob, datetime
 import json
 
 # Symmetrical crypto modules
@@ -26,7 +25,6 @@ from Crypto.Util.Padding import pad, unpad
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Random import get_random_bytes
-from Crypto.Hash import SHA256
 # store full directory path this python file is in
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -59,11 +57,6 @@ def server():
         try:
             # Server accepts client connection
             connectionSocket, addr = serverSocket.accept()
-
-            # obtain encryption key
-            #with open(dir_path + "/key", mode='rb') as file: 
-            #    key = file.read()
-            #cipher = AES.new(key, AES.MODE_ECB)
             
             # obtain server private key
             serverPrivateKey = RSA.import_key(open("server_private.pem").read())
@@ -90,7 +83,6 @@ def server():
 
                     # need to generate a key of 32 bytes for 256 AES symmetrical key, rather than 16 (which would be for 128 AES sym key)
                     symKey = get_random_bytes(32)
-                    print(f"symKey: {symKey}")
                     try:
                         # Encrypt using RSA Public Key for the final time
                         clientPublicKey = RSA.import_key(open(f"{clientInfo[0]}_public.pem").read())
@@ -101,13 +93,37 @@ def server():
 
                         # receive the symmetrical encryption starting here
                         encryptedMessage = connectionSocket.recv(2048)
-                        message = decrypt(encryptedMessage)
-
+                        message = decrypt(encryptedMessage, symKey)
+                        #print(message)
+                        
                         # Email system starts here
+                        clientChoice = "1"
+                        while clientChoice != "4":
+                            # send menu
+                            emailMenu = emailOptions()
+                            encryptedMenu = encrypt(emailMenu, symKey)
+                            connectionSocket.send(encryptedMenu)
 
+                            # receive client choice
+                            encryptedMessage = connectionSocket.recv(2048)
+                            clientChoice = decrypt(encryptedMessage, symKey)
+                            
+                            # split subprotocols here
+                            if clientChoice == "1":
+                                print("They chose 1")
+                                sendingEmailSubprotocol(connectionSocket, clientInfo[0], symKey)
+                                print("After sendEmailSubprotocol")
 
-                    except:
-                        print("encryption went wrong")
+                            elif clientChoice == "2":
+                                print("they chose 2")
+                            else:
+                                print("they chose 3")
+                        
+                        # terminate connection since Client chose "4"
+                        terminationSubprotocol(clientInfo[0])
+                        connectionSocket.close()
+                    except Exception as e:
+                        print("encryption went wrong", e) 
 
 
 
@@ -117,7 +133,6 @@ def server():
                     print(f"The received client information: {clientInfo[0]} is invalid (Connection Terminated)")
 
 
-                # message contains client's user name and password
 
                 # Client has chosen to terminate, thus server should terminate connection Socket on its end
                 connectionSocket.close()
@@ -134,10 +149,119 @@ def server():
             serverSocket.close()
             sys.exit(0)
 
+            
 """
+    Sending Email Subprotocol
+
+    Subprotocol for handling email sending from one Client to another Client.
+
+    Parameters
+    =============
+    key: The key used to encrypt/decrypt for the email exchange
+            - <byte> type
+    
+    clientUsername: The username of the client the socket is connected to (Mainly used for server logging)
+            - <string> type
+            
+    socket: The connection socket between client and server
+            - <socket> type
+    
+    
+    Returns:
+    None
+"""
+def sendingEmailSubprotocol(socket, clientUsername, key):
+    encryptedMessage = encrypt("Send the email", key)
+    socket.send(encryptedMessage)
+
+    encryptedMessage = socket.recv(2048)
+    expectedByteSize = int(decrypt(encryptedMessage, key))
+    print(f"this is expectedByteSize to receive: {expectedByteSize}")
+
+    encryptedMessage = encrypt("email size received", key)
+    socket.send(encryptedMessage)
+
+
+    # receive email contents now that we know the expected email size
+    receivedBytes = 0
+    email = ""
+    while receivedBytes < expectedByteSize:
+        encryptedMessage = socket.recv(2048)
+        email += decrypt(encryptedMessage, key)
+        receivedBytes += len(email)
+
+    # received email. Need to extract the necessary fields from the email
+    destination, emailContentLen = extractEmailFields(email)
+    print(f"\nAn email from {clientUsername} is sent to {destination} has a content length of {emailContentLen}.\n")
+
+    # need to add the time and date to the email. It needs to become the new field in the 3rd index, so it must be swapped
+    formattedEmail = addTimestampEmail(email)
+    print(formattedEmail) #DEBUG: for showing/debug the email. 
+  
+    return
 
 """
+    Inserts date and time received field of the email into the proper order
 
+    Parameters
+    =============
+    email: the email the source client sent
+            - <string> type
+
+    Returns:
+
+    
+"""
+def addTimestampEmail(email):
+    timestamp = datetime.datetime.now()
+    emailTimestampField = f"Time and Date: {timestamp} "
+    emailFieldsWithHeaders = email.split("\n", 6)
+    formattedEmail = emailFieldsWithHeaders[0] + "\n" + emailFieldsWithHeaders[1] + "\n" + emailTimestampField + emailFieldsWithHeaders[2] + "\n" + emailFieldsWithHeaders[3] + "\n" + emailFieldsWithHeaders[4] + "\n" + emailFieldsWithHeaders[5] + "\n"
+    return formattedEmail
+
+"""
+    Extract neccessary email fields from the email headers to log (server side)
+
+    Parameters
+    =============
+    email: a message containing the email as a whole
+            - <string> type
+    
+    Returns:
+
+"""
+def extractEmailFields(email):
+    emailFieldsWithHeaders = email.split("\n", 4)
+    destinationUsernames = emailFieldsWithHeaders[1]
+    destinationUsernames = destinationUsernames.split("To: ", 1)[-1]
+
+    contentLengthWithHeader = emailFieldsWithHeaders[3]
+    contentLength = contentLengthWithHeader.split("Content Length: ", 1)[-1]
+    return destinationUsernames, contentLength
+
+"""
+    Email Menu
+
+    Creates a menu string to send to the Client
+
+    Parameters
+    =============
+    None
+
+    Returns:
+    emailMenu: a string holding the menu options the Client can use
+            - <string> type
+"""
+def emailOptions():
+    emailMenu = """
+    Select the operation:
+    \t1) Create and send an email
+    \t2) Display the inbox list
+    \t3) Display the email contents
+    \t4) Terminate the connection choice:
+    choice: 
+    """
+    return emailMenu
 
 """
     Opens a json file containing registered Clients user and pass, by passing it into a dictionary and verifying it is within the key:value pairs.
@@ -214,6 +338,21 @@ def decrypt(message, key, name=None):
     return decryptedMessage
    # return decryptedMessage.decode("ascii")
 
+"""
+    Creates and sends a message to the client describing the connection between the server and the client is to be terminated.
+    Also prints it out for the server side to see.
+    *** mainly exists for maintainability and readability ***
+    
+    Parameters
+    =============
+    None
+
+    Returns:
+    None
+"""
+def terminationSubprotocol(clientUsername):
+    print(f"Terminating connection with {clientUsername}.")
+    return
 
 #----------
 server()
