@@ -1,7 +1,6 @@
 # modules
 import socket
 import sys, os
-import random
 
 # Symmetrical crypto modules
 from Crypto.Cipher import AES
@@ -44,11 +43,6 @@ def client():
         sys.exit(1)
     
     try:
-        # attempt to open key
-       # with open(dir_path + "/key", mode='rb') as file:
-        #    key = file.read()
-
-       # cipher = AES.new(key, AES.MODE_ECB)
 
         # Client connect with the server
         
@@ -70,7 +64,7 @@ def client():
 
         # receive response
         message = clientSocket.recv(2048)
-        print(message)
+        #print(message)
         # if message is less than 256 bytes, we know its unencrypted
         if len(message) < 256:
             message = clientSocket.recv(2048)
@@ -80,11 +74,35 @@ def client():
             clientPrivateKey = RSA.import_key(open(f"{username}_private.pem").read())
             clientCipher = PKCS1_OAEP.new(clientPrivateKey)
             symKey = clientCipher.decrypt(message)
-            #print(message)
+           
             
             encryptedMessage = encrypt("OK", symKey)
             clientSocket.send(encryptedMessage)
+    
+            # begin email system
+            clientChoice = "1"
+            while clientChoice != "4":
+               
+                # obtain menu prompts
+                encryptedMessage = clientSocket.recv(2048)
+                menu = decrypt(encryptedMessage, symKey)
 
+                # obtain client choice
+                clientChoice = validateClientChoice(menu)
+                encryptedMessage = encrypt(clientChoice, symKey)
+                clientSocket.send(encryptedMessage)
+                
+                # execute subprotocols based on client choice here
+                if clientChoice == "1":
+                    sendingEmailSubprotocol(clientSocket, symKey, username)
+                    #clientChoice = validateClientChoice(menu)
+
+
+
+            # Client chose option 4
+            terminationSubprotocol()
+            clientSocket.close()
+                
            # clientCipher = PKCS1_OAEP.new()
             print("Credentials verified")
         
@@ -103,6 +121,110 @@ def client():
         print("An error occured:", e)
         clientSocket.close()
         sys.exit(1)
+
+        
+"""
+    Sending Email Subprotocol
+    
+    Handles obtaining necessary information from Client to send an email, and formats it to specifications to be sent to server which is then sent to the desired Client
+
+    Parameters
+    =============
+    Socket: The connection socket between Client and Server
+            - <socket> type
+    key: the key used for encryption
+            - <byte> type
+    clientUsername: the username of the source client
+            - <string> type
+"""
+def sendingEmailSubprotocol(socket, key, clientUsername):
+    # receive the Send email message
+    encryptedMessage = socket.recv(2048)
+    message = decrypt(encryptedMessage, key)
+
+    email, emailByteSize = fetchEmailInfo(clientUsername)
+    print(email)
+    # send file size before sending over email so the server knows how many bytes are being sent
+    encryptedMessage = encrypt(emailByteSize, key)
+    socket.send(encryptedMessage)
+
+    # need to receive an okay response, otherwise server will be left hanging receiving
+    encryptedMessage = socket.recv(2048)
+    message = decrypt(encryptedMessage, key)
+
+    # start sending email. Since message contents can range, we must ensure all the data is sent 
+    encryptedMessage = encrypt(email, key)
+    bytesSent = 0
+    while bytesSent < int(emailByteSize):
+        bytesSent += socket.send(encryptedMessage)
+    return
+
+"""
+    Obtains necessary email information from client, to be send to the server
+
+    Parameters
+    =============
+
+    Returns:
+
+"""
+def fetchEmailInfo(clientUsername):
+    clientDestination = input("Please enter email destinations (separated by ;): ")
+    emailTitle = input("Please enter title of Email: ")
+    fileOrTerminalInput = input("Would you like to load contents from a file? (Y/N): ").upper()
+    while fileOrTerminalInput not in ["Y", "N"]:
+        print("Error: must enter either Y or N")
+        fileOrTerminalInput = input("Would you like to load contents from a file? (Y/N): ").upper()
+    # if client is entering message contents through terminal
+    if fileOrTerminalInput == "N":
+        messageContents = input("Enter message contents (1000000 character limit): ")
+        while len(messageContents) > 1000000:
+            print("ERROR: Message length is too long. Please limit to 1000000 characters.")
+            messageContents = input("Enter message contents (1000000 character limit): ")
+    else:
+        fileName = input("Please enter filename: ")
+        file = open(fileName, "r")
+        messageContents = file.read()
+    # structure email according to standards
+    email = formatEmail(clientDestination, emailTitle, messageContents, clientUsername)
+    return email, str(sys.getsizeof(email))
+"""
+    Formats the email information into a string, to be sent to the server
+
+    Parameters
+    =============
+    clientDestination: the clients the email is being sent to
+            - <string> type
+    emailTitle: the title of the email
+            - <string> type
+    messageContents: the contents of the email
+            - <string> type
+    clientUsername: The username of the source client who is sending the message
+            - <string> type
+    
+    Returns:
+    formattedEmail: a string that has the properly formatted email to be sent to the server
+            - <string> type
+"""
+def formatEmail(clientDestination, emailTitle, messageContents, clientUsername):
+    contentLength = len(messageContents)
+    email = f"From: {clientUsername} \nTo: {clientDestination} \nTitle: {emailTitle} \nContent Length: {contentLength} \nContent: \n{messageContents}\n"
+    return email
+
+"""
+    Prints a message to signify to Client that the connection to the server is being terminated.
+    ** This function mainly exists for future maintainability if additional features added to termination subprotocol***
+
+    Parameters
+    ============
+    None
+
+    Returns:
+    None
+"""
+def terminationSubprotocol():
+    print("The connection is terminated with the server.")
+    return
 
 """
     Encrypt function that pads messages and encrypts them for the Server to receive
@@ -144,6 +266,25 @@ def decrypt(message, key):
     decryptedMessage = unpad(decryptedMessage, 16)
     return decryptedMessage.decode("ascii")
 
+"""
+    validateClientChoice
 
+    verifies the Client choice to either {1, 2, 3, 4}, and will constantly reprompt client if the input is outside of these values
+
+    Parameters
+    =============
+    menu: the email options the Client can choose from by inputting their choice of {1, 2, 3, 4}
+            - <string> type
+    
+    Returns:
+    clientChoice: The selected choice/subprotocol of the Client
+            - <string> type
+"""
+def validateClientChoice(menu):
+    clientChoice = input(menu)
+    while clientChoice not in {"1", "2", "3", "4"}:
+        print("Invalid choice. Please choose between 1, 2, 3 or 4.")
+        clientChoice = input(menu)
+    return clientChoice
 #-------------
 client()
