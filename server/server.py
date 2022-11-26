@@ -196,9 +196,46 @@ def sendingEmailSubprotocol(socket, clientUsername, key):
 
     # need to add the time and date to the email. It needs to become the new field in the 3rd index, so it must be swapped
     formattedEmail = addTimestampEmail(email)
-    print(formattedEmail) #DEBUG: for showing/debug the email. 
+    print(formattedEmail) #DEBUG: for showing/debug the email.
+
+    storeEmail(formattedEmail, destination, clientUsername)
   
     return
+
+
+"""
+    Saves an email as a text file in the corresponding folder for
+    each specified recipient
+
+    Parameters
+    =============
+    formattedEmail: the email the source client sent
+            - <string> type
+            
+    destination: the username of each recipient, separated by ';'
+            - <string> type
+            
+    clientUsername: the username of the client sending the email
+            - <string> type
+
+    Returns:
+
+
+"""
+def storeEmail(formattedEmail, destination, clientUsername):
+    # if more than 1 destination, call this function for each
+    if ';' in destination:
+        destinations = destination.split(';')
+        for destination in destinations:
+            storeEmail(formattedEmail, destination, clientUsername)
+    else:
+        title = formattedEmail.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
+        filename = clientUsername + "_" + title + ".txt"
+        print("filename:", filename)
+        filepath = dir_path + "/" + destination.removesuffix(" ") + "/" + filename
+        print("filepath:", filepath)
+        with open(filepath, "w") as emailFile:
+            emailFile.write(formattedEmail)
 
 """
     Inserts date and time received field of the email into the proper order
@@ -216,7 +253,7 @@ def addTimestampEmail(email):
     timestamp = datetime.datetime.now()
     emailTimestampField = f"Time and Date: {timestamp} "
     emailFieldsWithHeaders = email.split("\n", 6)
-    formattedEmail = emailFieldsWithHeaders[0] + "\n" + emailFieldsWithHeaders[1] + "\n" + emailTimestampField + emailFieldsWithHeaders[2] + "\n" + emailFieldsWithHeaders[3] + "\n" + emailFieldsWithHeaders[4] + "\n" + emailFieldsWithHeaders[5] + "\n"
+    formattedEmail = emailFieldsWithHeaders[0] + "\n" + emailFieldsWithHeaders[1] + "\n" + emailTimestampField + "\n" + emailFieldsWithHeaders[2] + "\n" + emailFieldsWithHeaders[3] + "\n" + emailFieldsWithHeaders[4] + "\n" + emailFieldsWithHeaders[5] + "\n"
     return formattedEmail
 
 """

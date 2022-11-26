@@ -1,1 +1,1 @@
-# 361project
+# CMPT 361 Project: Group 7

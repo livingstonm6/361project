@@ -30,7 +30,7 @@ def client():
     # server information
 
     
-    serverName = input("Enter the server host name or IP:")
+    serverName = input("Enter the server host name or IP: ")
     if serverName == "localhost":
         serverName = "127.0.0.1" # 'localhost'
     
