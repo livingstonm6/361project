@@ -95,9 +95,16 @@ def client():
                 # execute subprotocols based on client choice here
                 if clientChoice == "1":
                     sendingEmailSubprotocol(clientSocket, symKey, username)
-                    #clientChoice = validateClientChoice(menu)
 
+                elif clientChoice == "2":
+                    # view list subprotocol
+                    encryptedMessage = clientSocket.recv(2048)
+                    message = decrypt(encryptedMessage, symKey)
+                    print(message)
 
+                elif clientChoice == "3":
+                    # view email contents subprotocol
+                    pass
 
             # Client chose option 4
             terminationSubprotocol()

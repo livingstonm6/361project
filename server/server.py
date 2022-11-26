@@ -97,6 +97,7 @@ def server():
                         #print(message)
                         
                         # Email system starts here
+                        maxIndex = -1
                         clientChoice = "1"
                         while clientChoice != "4":
                             # send menu
@@ -116,7 +117,10 @@ def server():
 
                             elif clientChoice == "2":
                                 print("they chose 2")
-                            else:
+                                maxIndex = viewListSubprotocol(connectionSocket, clientInfo[0], symKey)
+
+                            elif clientChoice == "3":
+                                # view email contents subprotocol
                                 print("they chose 3")
                         
                         # terminate connection since Client chose "4"
@@ -219,6 +223,7 @@ def sendingEmailSubprotocol(socket, clientUsername, key):
             - <string> type
 
     Returns:
+    None
 
 
 """
@@ -231,11 +236,14 @@ def storeEmail(formattedEmail, destination, clientUsername):
     else:
         title = formattedEmail.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
         filename = clientUsername + "_" + title + ".txt"
-        print("filename:", filename)
         filepath = dir_path + "/" + destination.removesuffix(" ") + "/" + filename
-        print("filepath:", filepath)
+
+        if not os.path.isdir(filepath.removesuffix(filename)):
+            os.mkdir(filepath.removesuffix(filename))
+
         with open(filepath, "w") as emailFile:
             emailFile.write(formattedEmail)
+    return
 
 """
     Inserts date and time received field of the email into the proper order
@@ -299,6 +307,60 @@ def emailOptions():
     choice: 
     """
     return emailMenu
+
+"""
+    View List Subprotocol
+
+    Checks if a user has any emails in their folder, and if they do,
+    sends a list of them to the client in a table.
+
+    Parameters
+    =============
+    connectionSocket: the socket used to communicate with the client
+            - <socket> type
+    username: the username of the user whose folder is being checked
+            for emails
+            - <string> type
+    key: the symmetric key used for encryption
+            - <byte> type
+
+    Returns:
+    index: the maximum index of all the emails found in the folder,
+            or -1 if no emails were found.
+            - <int> type
+"""
+def viewListSubprotocol(connectionSocket, username, key):
+    folderPath = dir_path + "/" + username
+    index = 0
+    # check if user's folder exists
+    if not os.path.isdir(folderPath):
+        message = "No emails found."
+    else:
+        header = f"{'Index':<6}{'From':<10}{'DateTime':<30}Title\n"
+        message = header
+        for filename in os.listdir(username):
+            filepath = os.path.join(folderPath, filename)
+            # read file info
+            with open(filepath, "r") as file:
+                email = file.read()
+
+            sender = email.split("\n")[0].removeprefix("From: ")
+            time = email.split("\n")[2].removeprefix("Time and Date: ")
+            title = email.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
+            line = f"{index:<6}{sender:<10}{time:<30}{title}"
+            message += line
+            index += 1
+        # if directory exists but no emails found
+        if message == header:
+            message = "No emails found."
+    # send table or error message to client
+    encryptedMessage = encrypt(message, key)
+    connectionSocket.send(encryptedMessage)
+
+    # return maximum index (-1 means no emails found)
+    return index - 1
+
+
 
 """
     Opens a json file containing registered Clients user and pass, by passing it into a dictionary and verifying it is within the key:value pairs.
