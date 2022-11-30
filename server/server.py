@@ -97,7 +97,7 @@ def server():
                         #print(message)
                         
                         # Email system starts here
-                        maxIndex = -1
+                        maxIndex = None
                         clientChoice = "1"
                         while clientChoice != "4":
                             # send menu
@@ -111,17 +111,20 @@ def server():
                             
                             # split subprotocols here
                             if clientChoice == "1":
-                                print("They chose 1")
+                                print(f"{clientInfo[0]}: running sendEmailSubprotocol")
                                 sendingEmailSubprotocol(connectionSocket, clientInfo[0], symKey)
-                                print("After sendEmailSubprotocol")
+                                print(f"{clientInfo[0]}: sendEmailSubprotocol complete")
 
                             elif clientChoice == "2":
-                                print("they chose 2")
+                                print(f"{clientInfo[0]}: running viewListSubprotocol")
                                 maxIndex = viewListSubprotocol(connectionSocket, clientInfo[0], symKey)
+                                print(f"{clientInfo[0]}: viewListSubprotocol complete")
 
                             elif clientChoice == "3":
                                 # view email contents subprotocol
-                                print("they chose 3")
+                                print(f"{clientInfo[0]}: running viewEmailSubprotocol")
+                                viewEmailSubprotocol(connectionSocket, clientInfo[0], symKey, maxIndex)
+                                print(f"{clientInfo[0]}: viewEmailSubprotocol complete")
                         
                         # terminate connection since Client chose "4"
                         terminationSubprotocol(clientInfo[0])
@@ -304,8 +307,7 @@ def emailOptions():
     \t2) Display the inbox list
     \t3) Display the email contents
     \t4) Terminate the connection choice:
-    choice: 
-    """
+    choice: """
     return emailMenu
 
 """
@@ -325,9 +327,9 @@ def emailOptions():
             - <byte> type
 
     Returns:
-    index: the maximum index of all the emails found in the folder,
-            or -1 if no emails were found.
+    index: the maximum index of all the emails found in the folder
             - <int> type
+    None: Returns None if no emails are found.
 """
 def viewListSubprotocol(connectionSocket, username, key):
     folderPath = dir_path + "/" + username
@@ -343,7 +345,6 @@ def viewListSubprotocol(connectionSocket, username, key):
             # read file info
             with open(filepath, "r") as file:
                 email = file.read()
-
             sender = email.split("\n")[0].removeprefix("From: ")
             time = email.split("\n")[2].removeprefix("Time and Date: ")
             title = email.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
@@ -356,10 +357,90 @@ def viewListSubprotocol(connectionSocket, username, key):
     # send table or error message to client
     encryptedMessage = encrypt(message, key)
     connectionSocket.send(encryptedMessage)
-
-    # return maximum index (-1 means no emails found)
+    # return maximum index or None
+    if index == 0:
+        return None
     return index - 1
 
+"""
+    View Email Subprotocol
+
+    Prompts the client program for an index corresponding to an email
+    in their inbox, then sends the email to the client.
+
+    Parameters
+    =============
+    connectionSocket: the socket used to communicate with the client
+            - <socket> type
+    username: the username of the client user
+            - <string> type
+    key: the symmetric key used for encryption
+            - <byte> type
+    maxIndex: the maximum email index found after last running
+                viewListProtocol
+            - <int> type
+
+    Returns:
+    Nothing
+"""
+
+def viewEmailSubprotocol(connectionSocket, username, key, maxIndex):
+    if maxIndex is None:
+        # client must view email in list first
+        message = "Please view an email in the email list.\n"
+    else:
+        # prompt client user for index
+        message = f"Please enter an email index (max {maxIndex}): "
+        encryptedMessage = encrypt(message, key)
+        connectionSocket.send(encryptedMessage)
+        # receive index
+        encryptedMessage = connectionSocket.recv(2048)
+        # check if index is valid
+        try:
+            index = int(decrypt(encryptedMessage, key))
+            if index > maxIndex or index < 0:
+                message = "Error: invalid index."
+            else:
+                message = getEmail(username, index)
+        # if client did not enter an integer
+        except ValueError:
+            message = "Error: invalid input."
+        print("message:", message)
+    # Send email contents or error message
+    encryptedMessage = encrypt(message, key)
+    connectionSocket.send(encryptedMessage)
+
+    return
+
+"""
+    Returns the contents of an email from a file stored in a user's 
+    inbox folder. Assumes there is always a valid email as this is
+    checked by viewEmailSubprotocol.
+
+    Parameters
+    =============
+    username: the username of the client user
+            - <string> type
+    target: the index of the target email
+            - <index> type
+
+    Returns:
+    email: all text stored in the email file
+            - <string> type
+"""
+
+def getEmail(username, target):
+    folderPath = dir_path + "/" + username
+    index = 0
+    for filename in os.listdir(username):
+        if index == target:
+            filepath = os.path.join(folderPath, filename)
+            # read file info
+            with open(filepath, "r") as emailFile:
+                email = emailFile.read()
+            return email
+        else:
+            index += 1
 
 
 """
