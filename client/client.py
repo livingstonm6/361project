@@ -98,13 +98,11 @@ def client():
 
                 elif clientChoice == "2":
                     # view list subprotocol
-                    encryptedMessage = clientSocket.recv(2048)
-                    message = decrypt(encryptedMessage, symKey)
-                    print(message)
+                    receiveAndPrintMessage(clientSocket, symKey)
 
                 elif clientChoice == "3":
                     # view email contents subprotocol
-                    pass
+                    viewEmailSubprotocol(clientSocket, symKey)
 
             # Client chose option 4
             terminationSubprotocol()
@@ -219,6 +217,39 @@ def formatEmail(clientDestination, emailTitle, messageContents, clientUsername):
     return email
 
 """
+    View Email Subprotocol
+
+    Prompts the user to enter an index corresponding to an email
+    in their inbox, sends it to the server, then prints the
+    server's response: either the email, or an error message.
+
+    Parameters
+    =============
+    clientSocket: the socket used to communicate with the server
+            - <socket> type
+    key: the symmetric key used for encryption
+            - <byte> type
+
+    Returns:
+    Nothing
+"""
+
+def viewEmailSubprotocol(clientSocket, key):
+    # get prompt for index from server, or error message
+    message = receiveAndPrintMessage(clientSocket, key)
+    if message == "Please view an email in the email list.\n":
+        return
+    # get index from user and send to server
+    index = input('')
+    encryptedMessage = encrypt(index, key)
+    clientSocket.send(encryptedMessage)
+    # receive email or error message from server
+    receiveAndPrintMessage(clientSocket, key)
+
+    return
+
+
+"""
     Prints a message to signify to Client that the connection to the server is being terminated.
     ** This function mainly exists for future maintainability if additional features added to termination subprotocol***
 
@@ -272,6 +303,29 @@ def decrypt(message, key):
     decryptedMessage = cipher.decrypt(message)
     decryptedMessage = unpad(decryptedMessage, 16)
     return decryptedMessage.decode("ascii")
+
+
+"""
+    Receives a message from the server program, decrypts it, then
+    prints it to the client user.
+
+    Parameters
+    =============
+    clientSocket: The socket used to communicate with the server
+            - <socket> type
+    key: The cipher key that is used to decrypt the message
+            - <byte> type
+
+    Returns:
+    message: the message send by the server program
+            - <string> type
+"""
+
+def receiveAndPrintMessage(clientSocket, key):
+    encryptedMessage = clientSocket.recv(2048)
+    message = decrypt(encryptedMessage, key)
+    print(message)
+    return message
 
 """
     validateClientChoice
