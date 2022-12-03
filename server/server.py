@@ -100,11 +100,11 @@ def server():
                         maxIndex = None
                         clientChoice = "1"
                         while clientChoice != "4":
-                            # send menu
-                            emailMenu = emailOptions()
-                            encryptedMenu = encrypt(emailMenu, symKey)
-                            connectionSocket.send(encryptedMenu)
-
+                            # send menu if first loop, client selected choice 1, or invalid input
+                            if clientChoice not in ["2", "3"]:
+                                emailMenu = emailOptions()
+                                encryptedMenu = encrypt(emailMenu, symKey)
+                                connectionSocket.send(encryptedMenu)
                             # receive client choice
                             encryptedMessage = connectionSocket.recv(2048)
                             clientChoice = decrypt(encryptedMessage, symKey)
@@ -348,14 +348,14 @@ def viewListSubprotocol(connectionSocket, username, key):
             sender = email.split("\n")[0].removeprefix("From: ")
             time = email.split("\n")[2].removeprefix("Time and Date: ")
             title = email.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
-            line = f"{index:<6}{sender:<10}{time:<30}{title}"
+            line = f"{index:<6}{sender:<10}{time:<30}{title}\n"
             message += line
             index += 1
         # if directory exists but no emails found
         if message == header:
             message = "No emails found."
     # send table or error message to client
-    encryptedMessage = encrypt(message, key)
+    encryptedMessage = encrypt(message + emailOptions(), key)
     connectionSocket.send(encryptedMessage)
     # return maximum index or None
     if index == 0:
@@ -407,7 +407,7 @@ def viewEmailSubprotocol(connectionSocket, username, key, maxIndex):
             message = "Error: invalid input."
         print("message:", message)
     # Send email contents or error message
-    encryptedMessage = encrypt(message, key)
+    encryptedMessage = encrypt(message + emailOptions(), key)
     connectionSocket.send(encryptedMessage)
 
     return

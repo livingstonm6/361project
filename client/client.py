@@ -82,16 +82,17 @@ def client():
             # begin email system
             clientChoice = "1"
             while clientChoice != "4":
-               
-                # obtain menu prompts
-                encryptedMessage = clientSocket.recv(2048)
-                menu = decrypt(encryptedMessage, symKey)
+                # obtain menu if first loop, client selected choice 1, or invalid input
+                if clientChoice not in ["2", "3"]:
+                    encryptedMessage = clientSocket.recv(2048)
+                    menu = decrypt(encryptedMessage, symKey)
+                    print(menu)
 
                 # obtain client choice
-                clientChoice = validateClientChoice(menu)
+                clientChoice = validateClientChoice()
                 encryptedMessage = encrypt(clientChoice, symKey)
                 clientSocket.send(encryptedMessage)
-                
+
                 # execute subprotocols based on client choice here
                 if clientChoice == "1":
                     sendingEmailSubprotocol(clientSocket, symKey, username)
@@ -341,11 +342,11 @@ def receiveAndPrintMessage(clientSocket, key):
     clientChoice: The selected choice/subprotocol of the Client
             - <string> type
 """
-def validateClientChoice(menu):
-    clientChoice = input(menu)
+def validateClientChoice():
+    clientChoice = input()
     while clientChoice not in {"1", "2", "3", "4"}:
         print("Invalid choice. Please choose between 1, 2, 3 or 4.")
-        clientChoice = input(menu)
+        clientChoice = input()
     return clientChoice
 #-------------
 client()
