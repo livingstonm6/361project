@@ -82,11 +82,11 @@ def client():
             # begin email system
             clientChoice = "1"
             while clientChoice != "4":
-                # obtain menu if first loop, client selected choice 1, or invalid input
+                # obtain menu if first loop or if client chose 1
                 if clientChoice not in ["2", "3"]:
                     encryptedMessage = clientSocket.recv(2048)
                     menu = decrypt(encryptedMessage, symKey)
-                    print(menu)
+                    print(menu, end='')
 
                 # obtain client choice
                 clientChoice = validateClientChoice()
@@ -149,7 +149,7 @@ def sendingEmailSubprotocol(socket, key, clientUsername):
     message = decrypt(encryptedMessage, key)
 
     email, emailByteSize = fetchEmailInfo(clientUsername)
-    print(email)
+    #print(email)
     # send file size before sending over email so the server knows how many bytes are being sent
     encryptedMessage = encrypt(emailByteSize, key)
     socket.send(encryptedMessage)
@@ -163,6 +163,8 @@ def sendingEmailSubprotocol(socket, key, clientUsername):
     bytesSent = 0
     while bytesSent < int(emailByteSize):
         bytesSent += socket.send(encryptedMessage)
+
+    print("The message has been sent to the server.")
     return
 
 """
@@ -182,15 +184,27 @@ def fetchEmailInfo(clientUsername):
         print("Error: must enter either Y or N")
         fileOrTerminalInput = input("Would you like to load contents from a file? (Y/N): ").upper()
     # if client is entering message contents through terminal
-    if fileOrTerminalInput == "N":
-        messageContents = input("Enter message contents (1000000 character limit): ")
-        while len(messageContents) > 1000000:
-            print("ERROR: Message length is too long. Please limit to 1000000 characters.")
+
+    while True:
+        if fileOrTerminalInput == "N":
             messageContents = input("Enter message contents (1000000 character limit): ")
-    else:
-        fileName = input("Please enter filename: ")
-        file = open(fileName, "r")
-        messageContents = file.read()
+            while len(messageContents) > 1000000:
+                print("ERROR: Message length is too long. Please limit to 1000000 characters.")
+                messageContents = input("Enter message contents (1000000 character limit): ")
+        else:
+            fileName = input("Please enter filename: ")
+            filePath = dir_path + "/" + fileName
+            if os.path.isfile(filePath):
+                with open(fileName, "r") as file:
+                    messageContents = file.read()
+            else:
+                messageContents = ""
+        if len(messageContents) > 1000000:
+            print("ERROR: Message length is too long. Please limit to 1000000 characters.")
+        elif len(messageContents) == 0:
+            print("ERROR: Invalid message or file. Please try again.")
+        else:
+            break
     # structure email according to standards
     email = formatEmail(clientDestination, emailTitle, messageContents, clientUsername)
     return email, str(sys.getsizeof(email))
@@ -238,7 +252,7 @@ def formatEmail(clientDestination, emailTitle, messageContents, clientUsername):
 def viewEmailSubprotocol(clientSocket, key):
     # get prompt for index from server, or error message
     message = receiveAndPrintMessage(clientSocket, key)
-    if message == "Please view an email in the email list.\n":
+    if message[:40] == "Please view an email in the email list.\n":
         return
     # get index from user and send to server
     index = input('')
@@ -325,7 +339,7 @@ def decrypt(message, key):
 def receiveAndPrintMessage(clientSocket, key):
     encryptedMessage = clientSocket.recv(2048)
     message = decrypt(encryptedMessage, key)
-    print(message)
+    print(message, end='')
     return message
 
 """

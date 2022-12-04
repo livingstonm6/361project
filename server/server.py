@@ -74,8 +74,6 @@ def server():
                 message = serverCipher.decrypt(encryptedMessage)
                 message = message.decode("ascii")
 
-                print("decrypted Message")
-
                 # Verify if credentials are correct
                 clientInfo = message.split(" ")
                 if credentials(clientInfo[0], clientInfo[1]):
@@ -183,7 +181,7 @@ def sendingEmailSubprotocol(socket, clientUsername, key):
 
     encryptedMessage = socket.recv(2048)
     expectedByteSize = int(decrypt(encryptedMessage, key))
-    print(f"this is expectedByteSize to receive: {expectedByteSize}")
+    # print(f"this is expectedByteSize to receive: {expectedByteSize}")
 
     encryptedMessage = encrypt("email size received", key)
     socket.send(encryptedMessage)
@@ -199,11 +197,11 @@ def sendingEmailSubprotocol(socket, clientUsername, key):
 
     # received email. Need to extract the necessary fields from the email
     destination, emailContentLen = extractEmailFields(email)
-    print(f"\nAn email from {clientUsername} is sent to {destination} has a content length of {emailContentLen}.\n")
+    print(f"An email from {clientUsername} is sent to {destination} has a content length of {emailContentLen}.")
 
     # need to add the time and date to the email. It needs to become the new field in the 3rd index, so it must be swapped
     formattedEmail = addTimestampEmail(email)
-    print(formattedEmail) #DEBUG: for showing/debug the email.
+    #print(formattedEmail) #DEBUG: for showing/debug the email.
 
     storeEmail(formattedEmail, destination, clientUsername)
   
@@ -237,12 +235,16 @@ def storeEmail(formattedEmail, destination, clientUsername):
         for destination in destinations:
             storeEmail(formattedEmail, destination, clientUsername)
     else:
-        title = formattedEmail.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
+        title = formattedEmail.split("\n")[3][7:-1]
         filename = clientUsername + "_" + title + ".txt"
-        filepath = dir_path + "/" + destination.removesuffix(" ") + "/" + filename
+        if destination[-1] == " ":
+            destination = destination[:-1]
+        filepath = dir_path + "/" + destination + "/"
 
-        if not os.path.isdir(filepath.removesuffix(filename)):
-            os.mkdir(filepath.removesuffix(filename))
+        if not os.path.isdir(filepath):
+            os.mkdir(filepath)
+
+        filepath = filepath + filename
 
         with open(filepath, "w") as emailFile:
             emailFile.write(formattedEmail)
@@ -306,7 +308,7 @@ def emailOptions():
     \t1) Create and send an email
     \t2) Display the inbox list
     \t3) Display the email contents
-    \t4) Terminate the connection choice:
+    \t4) Terminate the connection
     choice: """
     return emailMenu
 
@@ -336,7 +338,7 @@ def viewListSubprotocol(connectionSocket, username, key):
     index = 0
     # check if user's folder exists
     if not os.path.isdir(folderPath):
-        message = "No emails found."
+        message = "No emails found.\n"
     else:
         header = f"{'Index':<6}{'From':<10}{'DateTime':<30}Title\n"
         message = header
@@ -345,15 +347,15 @@ def viewListSubprotocol(connectionSocket, username, key):
             # read file info
             with open(filepath, "r") as file:
                 email = file.read()
-            sender = email.split("\n")[0].removeprefix("From: ")
-            time = email.split("\n")[2].removeprefix("Time and Date: ")
-            title = email.split("\n")[3].removeprefix("Title: ").removesuffix(" ")
+            sender = email.split("\n")[0][6:]
+            time = email.split("\n")[2][15:]
+            title = email.split("\n")[3][7:-1]
             line = f"{index:<6}{sender:<10}{time:<30}{title}\n"
             message += line
             index += 1
         # if directory exists but no emails found
         if message == header:
-            message = "No emails found."
+            message = "No emails found.\n"
     # send table or error message to client
     encryptedMessage = encrypt(message + emailOptions(), key)
     connectionSocket.send(encryptedMessage)
@@ -405,7 +407,6 @@ def viewEmailSubprotocol(connectionSocket, username, key, maxIndex):
         # if client did not enter an integer
         except ValueError:
             message = "Error: invalid input."
-        print("message:", message)
     # Send email contents or error message
     encryptedMessage = encrypt(message + emailOptions(), key)
     connectionSocket.send(encryptedMessage)
