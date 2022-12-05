@@ -5,7 +5,7 @@
     This utilizes encryption to verify the identity of Server and Client, and terminates the connection immediately if either side cannot verify themselves.
 
 
-    Author: Alex Creencia, 
+    Author: Alex Creencia, Muhammad Hamza Javed, Michael Livingston
 
 """
 
@@ -28,6 +28,13 @@ from Crypto.Random import get_random_bytes
 # store full directory path this python file is in
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
+"""
+    creates and serves clients an safe email file system.
+    It achieves this by first:
+        1) Verifying if the Client has the proper credentials
+        2) Verifying the Client's identity by encrypting with their public key
+        3) Begins serving the email system, where the Client can create an email and send it to other Clients, view their inbox, view a specified email or finally terminate the connection
+"""
 def server():
     # Server port
     serverPort = 13000
@@ -257,7 +264,8 @@ def storeEmail(formattedEmail, destination, clientUsername):
             - <string> type
 
     Returns:
-
+    formattedEmail: the formatted email that contains the time stamp field
+            - <string> type
     
 """
 def addTimestampEmail(email):
@@ -276,6 +284,7 @@ def addTimestampEmail(email):
             - <string> type
     
     Returns:
+    destinationUsernames: the destination usernames
 
 """
 def extractEmailFields(email):
