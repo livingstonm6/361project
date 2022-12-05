@@ -5,7 +5,7 @@
     This utilizes encryption to verify the identity of Server and Client, and terminates the connection immediately if either side cannot verify themselves.
 
 
-    Author: Alex Creencia, 
+    Author: Alex Creencia, Michael Livingston, Muhammad Hamza Javed
 
 """
 
@@ -278,7 +278,11 @@ def addTimestampEmail(email):
             - <string> type
     
     Returns:
-
+    destinationUsernames: The usernames the emails are being sent to
+            - <string> type
+            
+    contentLength: The length of the email contents
+            - <string> type
 """
 def extractEmailFields(email):
     emailFieldsWithHeaders = email.split("\n", 4)
