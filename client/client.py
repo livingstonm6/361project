@@ -1,3 +1,16 @@
+"""
+    Client Email System
+
+    Connects with the Email System server side using Credentials to verify and allow the user to:
+        1) Create emails and send them to other clients using the same Email System
+        2) View Email inboxes
+        3) View Email contents
+        4) Terminate connection with the server
+
+
+Authors: Alex Creencia, Michael Livingston, Muhammaed Hamza Javed
+"""
+
 # modules
 import socket
 import sys, os
@@ -14,10 +27,7 @@ from Crypto.Cipher import PKCS1_OAEP
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 """
-    Client version of the Online Math exam system. 
-    The client will be prompted and expected to:
-        1) Give their name to the server
-        2) Be given a set of 4 questions, and give a response to each question
+    Client version of the Email System.
     
     Parameters
     =============
@@ -172,9 +182,14 @@ def sendingEmailSubprotocol(socket, key, clientUsername):
 
     Parameters
     =============
-
+    clientUsername: The username of the client
+            - <string> type
+            
     Returns:
-
+    email: The Email (and its contents) 
+            - <string> type
+    sizeOfEmail: The size of the Email being sent to the server
+            - <byte> type
 """
 def fetchEmailInfo(clientUsername):
     clientDestination = input("Please enter email destinations (separated by ;): ")
